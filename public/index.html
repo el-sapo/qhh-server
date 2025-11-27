@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QHH Server Admin</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f7f7f7;
+      margin: 0;
+      padding: 0;
+      color: #222;
+    }
+    .container {
+      max-width: 720px;
+      margin: 40px auto;
+      background: #fff;
+      padding: 24px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    h1 {
+      margin-top: 0;
+      font-size: 24px;
+    }
+    label {
+      display: block;
+      margin-top: 16px;
+      font-weight: bold;
+    }
+    input {
+      width: 100%;
+      padding: 10px;
+      margin-top: 6px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    button {
+      margin-top: 20px;
+      padding: 12px 18px;
+      background: #0066cc;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 15px;
+      cursor: pointer;
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .status {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 4px;
+      display: none;
+    }
+    .status.success {
+      display: block;
+      background: #e6f4ea;
+      color: #1e7b34;
+      border: 1px solid #c5e7cf;
+    }
+    .status.error {
+      display: block;
+      background: #fdeaea;
+      color: #a33030;
+      border: 1px solid #f3c5c5;
+    }
+    .current-values {
+      margin-top: 24px;
+      padding: 12px;
+      background: #fafafa;
+      border: 1px solid #e1e1e1;
+      border-radius: 4px;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>QHH API Admin</h1>
+    <p>Update the file URL or title returned by the API. The updated date is automatically set to the last change.</p>
+
+    <form id="update-form">
+      <label for="title">Title</label>
+      <input id="title" name="title" type="text" placeholder="QHH - 327" />
+
+      <label for="file_url">File URL</label>
+      <input id="file_url" name="file_url" type="url" placeholder="https://github.com/.../QHH-327.pdf" />
+
+      <button type="submit">Update values</button>
+    </form>
+
+    <div id="status" class="status"></div>
+
+    <div class="current-values" id="current-values"></div>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const currentValuesEl = document.getElementById('current-values');
+    const form = document.getElementById('update-form');
+
+    function showStatus(message, type) {
+      statusEl.textContent = message;
+      statusEl.className = `status ${type}`;
+    }
+
+    function renderValues(data) {
+      currentValuesEl.innerHTML = `
+        <strong>Title:</strong> ${data.title}<br />
+        <strong>File URL:</strong> <a href="${data.file_url}" target="_blank" rel="noreferrer">${data.file_url}</a><br />
+        <strong>Updated:</strong> ${new Date(data.updated_date).toLocaleString()}
+      `;
+      form.title.value = data.title;
+      form.file_url.value = data.file_url;
+    }
+
+    async function fetchValues() {
+      const response = await fetch('/api/info');
+      if (!response.ok) {
+        showStatus('Failed to fetch current values.', 'error');
+        return;
+      }
+      const data = await response.json();
+      renderValues(data);
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const payload = {
+        title: form.title.value.trim(),
+        file_url: form.file_url.value.trim()
+      };
+
+      if (!payload.title && !payload.file_url) {
+        showStatus('Please provide a title or file URL to update.', 'error');
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/info', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Update failed');
+        }
+
+        const data = await response.json();
+        renderValues(data);
+        showStatus('Values updated successfully.', 'success');
+      } catch (error) {
+        showStatus(error.message, 'error');
+      }
+    });
+
+    fetchValues();
+  </script>
+</body>
+</html>
